@@ -12,12 +12,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    services:
-      redis:
-        image: redis
-        ports:
-          - 6379:6379
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -28,9 +22,8 @@ jobs:
     - name: Set up FreeBSD environment
       run: |
         docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-        docker run --name freebsd -d freebsd:12.2 tail -f /dev/null
+        docker run --name freebsd -d myusername/freebsd-custom:latest tail -f /dev/null
         docker cp . freebsd:/workspace
-        docker exec freebsd sh -c "pkg install -y git go"
         docker exec freebsd sh -c "cd /workspace && env GOOS=freebsd GOARCH=amd64 go build -o cloudflared"
 
     - name: Retrieve built binary
