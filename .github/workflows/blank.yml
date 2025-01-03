@@ -10,35 +10,34 @@ on:
 
 jobs:
   build:
-    name: Build for FreeBSD
     runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+
     steps:
-      # Step 1: Checkout the source code
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      # Step 2: Set up Go
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.20'  # 使用 cloudflared 需要的 Go 版本
+    - name: Install FreeBSD QEMU
+      run: sudo apt-get update && sudo apt-get install -y qemu-user-static
 
-      # Step 3: Install cross-compilation tools
-      - name: Install FreeBSD cross-compiler
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-12 g++-12 make
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
+    - name: Set up FreeBSD environment
+      run: |
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+        docker run --name freebsd -d freebsd:12.2 tail -f /dev/null
+        docker cp . freebsd:/workspace
+        docker exec freebsd sh -c "pkg install -y git go"
+        docker exec freebsd sh -c "cd /workspace && env GOOS=freebsd GOARCH=amd64 go build -o cloudflared"
 
-      # Step 4: Cross-compile for FreeBSD
-      - name: Build for FreeBSD
-        run: |
-          GOOS=freebsd GOARCH=amd64 go build -o cloudflared-freebsd ./cmd/cloudflared
+    - name: Retrieve built binary
+      run: docker cp freebsd:/workspace/cloudflared .
 
-      # Step 5: Upload the binary as an artifact
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: cloudflared-freebsd
-          path: cloudflared-freebsd
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: cloudflared-freebsd
+        path: ./cloudflared
